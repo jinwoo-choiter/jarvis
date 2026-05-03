@@ -1,0 +1,25 @@
+# Committed defaults. Safe to read by anyone.
+# User-specific overrides live in `config.local.yaml` (gitignored).
+# When both are present, `config.local.yaml` wins on a per-key basis.
+
+arxiv:
+  # arXiv categories to include in the daily brief.
+  # `cs.RO` (Robotics) is the v1 reference category.
+  # Add or replace categories in `config.local.yaml`.
+  categories:
+    - cs.RO
+
+youtube:
+  # Channel IDs (the `UC...` form, not the @handle).
+  # Leave empty in the committed default; populate in `config.local.yaml`.
+  channels: []
+
+schedule:
+  # Recommended cron schedule. The user registers cron themselves;
+  # this entry exists only as documentation.
+  cron: "0 7 * * *"
+  timezone: "local"
+
+window:
+  # Lookback window for "what was published yesterday".
+  hours: 24

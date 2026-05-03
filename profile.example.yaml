@@ -1,0 +1,22 @@
+# Copy to `profile.local.yaml` and edit. `profile.local.yaml` is gitignored.
+# The synthesis prompt reads this file at runtime to bias categorization
+# and prioritization.
+
+# Your professional role and current focus, in one or two sentences.
+role: |
+  e.g. "Software engineer focused on real-time control systems."
+
+# Keywords or topics to prioritize when ranking items.
+priority_keywords:
+  - example-keyword-1
+  - example-keyword-2
+
+# Upcoming events that should boost related items.
+# Use absolute dates (YYYY-MM-DD).
+upcoming_events:
+  - description: "e.g. attending a conference"
+    date: "2026-01-01"
+
+# The output language for the briefing body.
+# The JARVIS-voice opener and closer are always in English.
+output_language: "en"

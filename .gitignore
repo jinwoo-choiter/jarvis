@@ -1,0 +1,29 @@
+# --- secrets / personal context (NEVER commit) ---
+.env
+*.local.yaml
+prompts/*.local.md
+
+# --- generated state ---
+state/seen.sqlite
+state/seen.sqlite-journal
+state/seen.sqlite-wal
+state/seen.sqlite-shm
+run.log
+
+# --- ephemeral pipeline artifacts ---
+/tmp/raw/
+/tmp/briefing.md
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- editor / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
