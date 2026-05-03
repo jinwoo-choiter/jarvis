@@ -1,0 +1,222 @@
+"""SQLite seen-item store.
+
+Schema:
+    seen(url_hash TEXT PRIMARY KEY, first_seen TIMESTAMP NOT NULL, category TEXT)
+
+Workflow:
+    init_db()                              -- idempotent
+    new_envelope = dedupe(envelopes)       -- emits items absent from the store
+    mark_seen(items)                       -- only after delivery succeeds
+
+CLI usage (driven by run.sh):
+    python -m jarvis.state dedupe <path>...        > /tmp/raw/new.json
+    python -m jarvis.state mark-seen [<path>]      # reads stdin if no path
+    python -m jarvis.state init-db                 # rare; auto-run by other commands
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import sqlite3
+import sys
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def _db_path() -> Path:
+    return _repo_root() / "state" / "seen.sqlite"
+
+
+def _now_utc_iso() -> str:
+    return dt.datetime.now(tz=dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def url_hash(url: str) -> str:
+    """Stable hash key over the canonical URL.
+
+    Canonicalization is intentionally minimal: lowercase scheme + netloc,
+    preserve path/query exactly. The same URL always produces the same hash
+    across runs and machines.
+    """
+    parsed = urlparse(url.strip())
+    canonical = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}{parsed.path}"
+    if parsed.query:
+        canonical += f"?{parsed.query}"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _connect() -> sqlite3.Connection:
+    db_path = _db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db() -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS seen (
+                url_hash   TEXT PRIMARY KEY,
+                first_seen TEXT NOT NULL,
+                category   TEXT
+            )
+            """
+        )
+
+
+def _existing_hashes(conn: sqlite3.Connection, hashes: set[str]) -> set[str]:
+    if not hashes:
+        return set()
+    placeholders = ",".join("?" for _ in hashes)
+    rows = conn.execute(
+        f"SELECT url_hash FROM seen WHERE url_hash IN ({placeholders})",
+        list(hashes),
+    ).fetchall()
+    return {row[0] for row in rows}
+
+
+def dedupe(envelopes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Return a single envelope of items whose URL hashes are not yet seen.
+
+    Items missing a `url` are dropped (defensive — they cannot be deduped).
+    Within a single dedupe call, duplicate URLs across the input collapse
+    to the first occurrence.
+    """
+    init_db()
+
+    candidate_items: list[dict[str, Any]] = []
+    candidate_hashes: list[str] = []
+    seen_in_input: set[str] = set()
+
+    for envelope in envelopes:
+        for item in envelope.get("items", []) or []:
+            url = (item.get("url") or "").strip()
+            if not url:
+                continue
+            h = url_hash(url)
+            if h in seen_in_input:
+                continue
+            seen_in_input.add(h)
+            candidate_items.append(item)
+            candidate_hashes.append(h)
+
+    with _connect() as conn:
+        already = _existing_hashes(conn, set(candidate_hashes))
+
+    new_items = [
+        item
+        for item, h in zip(candidate_items, candidate_hashes)
+        if h not in already
+    ]
+
+    return {
+        "source": "dedupe",
+        "fetched_at": _now_utc_iso(),
+        "items": new_items,
+    }
+
+
+def mark_seen(envelope: dict[str, Any]) -> int:
+    """Insert URL hashes for the items in `envelope` into the seen store.
+
+    Returns the number of newly inserted rows. Items missing a `url` are
+    skipped. Duplicate hashes (already-seen items) are silently ignored
+    via INSERT OR IGNORE.
+    """
+    init_db()
+    now = _now_utc_iso()
+    rows: list[tuple[str, str, str | None]] = []
+    for item in envelope.get("items", []) or []:
+        url = (item.get("url") or "").strip()
+        if not url:
+            continue
+        category = None
+        item_id = item.get("id") or ""
+        if isinstance(item_id, str) and ":" in item_id:
+            category = item_id.split(":", 1)[0]
+        rows.append((url_hash(url), now, category))
+
+    if not rows:
+        return 0
+
+    with _connect() as conn:
+        cur = conn.executemany(
+            "INSERT OR IGNORE INTO seen(url_hash, first_seen, category) VALUES (?, ?, ?)",
+            rows,
+        )
+        conn.commit()
+        return cur.rowcount if cur.rowcount is not None else 0
+
+
+def _load_envelopes_from_paths(paths: list[str]) -> list[dict[str, Any]]:
+    envelopes: list[dict[str, Any]] = []
+    for path in paths:
+        with open(path, "r", encoding="utf-8") as f:
+            envelopes.append(json.load(f))
+    return envelopes
+
+
+def _load_envelope_from_path_or_stdin(path: str | None) -> dict[str, Any]:
+    if path is None or path == "-":
+        return json.load(sys.stdin)
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="jarvis.state")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("init-db", help="Create the seen.sqlite database if missing")
+
+    p_dedupe = sub.add_parser(
+        "dedupe",
+        help="Read fetcher envelopes; emit a single envelope of new items.",
+    )
+    p_dedupe.add_argument("paths", nargs="+", help="Fetcher envelope JSON paths")
+
+    p_mark = sub.add_parser(
+        "mark-seen",
+        help="Record items from an envelope as seen.",
+    )
+    p_mark.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Envelope JSON path; reads stdin if omitted or '-'.",
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.cmd == "init-db":
+        init_db()
+        return 0
+
+    if args.cmd == "dedupe":
+        envelopes = _load_envelopes_from_paths(args.paths)
+        result = dedupe(envelopes)
+        json.dump(result, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+
+    if args.cmd == "mark-seen":
+        envelope = _load_envelope_from_path_or_stdin(args.path)
+        n = mark_seen(envelope)
+        print(f"[state] marked {n} item(s) as seen", file=sys.stderr)
+        return 0
+
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
