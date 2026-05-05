@@ -11,7 +11,8 @@ The briefing is delivered to the user's Slack channel verbatim. Only your final 
 Before anything else, read these files:
 
 1. **`profile.local.yaml`** — the user's role, priority keywords, upcoming events, and `output_language`. Use this to bias categorization, prioritization, and language choice. If the file does not exist, fall back to `profile.example.yaml` and proceed in English.
-2. **Every `*.json` file inside the directory exposed via `--add-dir`** (typically `/tmp/raw/`). Each file is one fetcher's output, conforming to the schema:
+2. **`config.yaml`**, and **`config.local.yaml`** if present — read the `window.hours` (deterministic lookback) and `window.heuristic_hours` (heuristic lookback) values. `config.local.yaml` overrides `config.yaml` at the top-level key. Defaults if missing: `window.hours = 24`, `window.heuristic_hours = 168`.
+3. **Every `*.json` file inside the directory exposed via `--add-dir`** (typically `/tmp/raw/`). Each file is one fetcher's output, conforming to the schema:
    ```json
    {
      "source": "<source-name>",
@@ -30,7 +31,12 @@ Before anything else, read these files:
 
 ## 1. Time filter
 
-Today's date is the current date in the user's local timezone. Include only items whose `published_at` falls within the last **24 hours** relative to now. Exclude any item — fetcher-sourced *or* `web_search`-found — whose publication time you cannot determine from the data itself. Do not infer publication time from page wording or visit time; if it is not explicit, drop the item.
+Today's date is the current date in the user's local timezone. Two windows govern inclusion, both relative to now:
+
+- **Deterministic items** (from the `--add-dir` JSON files): include only items whose `published_at` falls within the last `window.hours` (default 24).
+- **Heuristic items** (from `web_search`): include only items whose `published_at` falls within the last `window.heuristic_hours` (default 168, i.e. 7 days). The wider window is intentional — career industry news and leisure topics post at weekly, not daily, cadence.
+
+Exclude any item — fetcher-sourced *or* `web_search`-found — whose publication time you cannot determine from the data itself. Do not infer publication time from page wording or visit time; if it is not explicit, drop the item.
 
 ---
 
@@ -120,7 +126,7 @@ The JARVIS voice (`Good morning, sir.` / `That will be all, sir.`) appears **onl
   ```
   🎩 Good morning, sir.
 
-  No qualifying updates in the last 24 hours.
+  No qualifying updates in today's windows.
 
   That will be all, sir.
   ```

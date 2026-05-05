@@ -21,5 +21,11 @@ schedule:
   timezone: "local"
 
 window:
-  # Lookback window for "what was published yesterday".
+  # Lookback window for the deterministic fetchers (arXiv, YouTube).
+  # arXiv and YouTube post at near-daily cadence, so 24h is the sensible default.
   hours: 24
+  # Lookback window for the synthesis prompt's heuristic web_search branch
+  # (career industry news + leisure topics like concerts, park events).
+  # These cadences are weekly at best — a 24h heuristic window is almost
+  # always empty.
+  heuristic_hours: 168
