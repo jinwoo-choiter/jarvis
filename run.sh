@@ -96,7 +96,13 @@ else
 fi
 [[ -f "$PROMPT_PATH" ]] || die "prompt file missing: $PROMPT_PATH"
 
-claude -p "$(cat "$PROMPT_PATH")" --add-dir "$RAW_DIR" > "$BRIEFING_FILE" 2>>"$LOG_FILE" \
+# WebSearch and WebFetch are deny-by-default in `claude -p` headless mode;
+# without these flags the prompt's heuristic search_themes branch silently
+# no-ops (no career/leisure web coverage at all).
+claude -p "$(cat "$PROMPT_PATH")" \
+  --add-dir "$RAW_DIR" \
+  --allowedTools "WebSearch" "WebFetch" \
+  > "$BRIEFING_FILE" 2>>"$LOG_FILE" \
   || die "claude synthesis failed"
 
 if [[ ! -s "$BRIEFING_FILE" ]]; then
