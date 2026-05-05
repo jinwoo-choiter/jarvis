@@ -31,12 +31,13 @@ Before anything else, read these files:
 
 ## 1. Time filter
 
-Today's date is the current date in the user's local timezone. Two windows govern inclusion, both relative to now:
+Today's date is the current date in the user's local timezone. Inclusion rules differ by item type:
 
-- **Deterministic items** (from the `--add-dir` JSON files): include only items whose `published_at` falls within the last `window.hours` (default 24).
-- **Heuristic items** (from `web_search`): include only items whose `published_at` falls within the last `window.heuristic_hours` (default 168, i.e. 7 days). The wider window is intentional — career industry news and leisure topics post at weekly, not daily, cadence.
+- **Deterministic items** (from the `--add-dir` JSON files): include only items whose `published_at` falls within the last `window.hours` (default 24). Drop any item without a parseable publication timestamp; do not infer it from page wording.
+- **Heuristic news-style items** (`web_search` results that are articles, blog posts, press releases, analyses): include only items whose `published_at` falls within the last `window.heuristic_hours` (default 168, i.e. 7 days). Drop if the article publication date is not explicit on the page.
+- **Heuristic event-style items** (`web_search` results whose primary subject is a *date-anchored event* — concert ticketing pages, theme-park ride opening notices, exhibition openings, festival announcements): include if the event date is either in the **future** or within the last `window.heuristic_hours`. The page's own publication date is irrelevant for these — the event date is what the user cares about, and ticketing pages frequently lack a parseable publication timestamp. Cite the **event date** (not a publication date) in the briefing entry, and explicitly mark items whose ticketing or attendance window is imminent.
 
-Exclude any item — fetcher-sourced *or* `web_search`-found — whose publication time you cannot determine from the data itself. Do not infer publication time from page wording or visit time; if it is not explicit, drop the item.
+This split exists because the user's leisure interests are inherently event-driven ("when does ticketing open?", "when does the new attraction open?") whereas the career interests are news-driven. A ticketing page posted six months ago for a concert next week is exactly the signal the user wants, even though "publication" was long ago.
 
 ---
 
@@ -50,7 +51,7 @@ Read every JSON file exposed via `--add-dir`. Categorize each item by the user's
 
 Use the `web_search` tool to gather items for the keyword themes declared under `search_themes` in `config.local.yaml` (and, if absent, in `config.yaml`). Treat the themes literally — do not invent new themes the user did not declare.
 
-For each search result you keep, record its source URL and publication timestamp. Apply the time filter from §1; drop any result without a parseable timestamp.
+For each search result, record its source URL and the date the user actually needs (publication date for news-style items, event date for event-style items). Apply the time filter from §1.
 
 ---
 
