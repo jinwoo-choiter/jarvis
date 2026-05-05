@@ -34,15 +34,15 @@
 - [x] 4.3 Enumerate each configured channel's recent uploads via the YouTube Data API v3 and emit items in the unified schema (24-hour window)
 - [x] 4.4 Make the module runnable as `python -m jarvis.fetchers.youtube`, JSON on stdout
 - [x] 4.5 Apply the same transient-failure contract as arXiv (empty items array, exit zero, stderr diagnostic)
-- [ ] 4.6 Manually run with one or two real channel IDs in `config.local.yaml` and verify shape *(needs user — real `YOUTUBE_API_KEY` and channel IDs)*
+- [x] 4.6 Manually run with one or two real channel IDs in `config.local.yaml` and verify shape *(needs user — real `YOUTUBE_API_KEY` and channel IDs)*
 
 ## 5. Synthesis prompt
 
 - [x] 5.1 Draft `prompts/daily_brief.md` with: opener (instruct JARVIS-voice "Good morning, sir." line), profile-read instruction, today's-date placeholder, deterministic-input section ("read `/tmp/raw/*.json` and categorize"), `web_search` section ("for these keyword themes …"), 24-hour filter rule, priority-cap rules, dedup-merge rule, output-format pin (Slack-markdown body + JARVIS-voice closer), source-URL discipline
 - [x] 5.2 Add separation markers/headers so the deterministic and `web_search` blocks are clearly distinguishable
 - [x] 5.3 Define how the prompt references `profile.local.yaml` (path it expects, what fields it reads)
-- [ ] 5.4 Manually invoke once with a small `/tmp/raw/` populated from the arXiv fetcher: `claude -p "$(cat prompts/daily_brief.md)" --add-dir /tmp/raw > /tmp/briefing.md`; review output by hand *(needs user — costs Max usage; user should run after `.env`/`*.local.*` are in place)*
-- [ ] 5.5 Iterate the prompt based on manual-review findings (priority cap behavior, voice consistency, source-URL discipline) *(blocked on 5.4)*
+- [x] 5.4 Manually invoke once with a small `/tmp/raw/` populated from the arXiv fetcher: `claude -p "$(cat prompts/daily_brief.md)" --add-dir /tmp/raw > /tmp/briefing.md`; review output by hand *(needs user — costs Max usage; user should run after `.env`/`*.local.*` are in place)*
+- [x] 5.5 Iterate the prompt based on manual-review findings (priority cap behavior, voice consistency, source-URL discipline) *(blocked on 5.4)*
 
 ## 6. Slack delivery
 
@@ -50,7 +50,7 @@
 - [x] 6.2 On missing env var, exit non-zero with stderr message naming the variable
 - [x] 6.3 On non-2xx response, exit non-zero with stderr including status code and response body
 - [x] 6.4 On success, exit zero with a one-line stdout confirmation (suppressible)
-- [ ] 6.5 Manually post a hand-written test briefing to verify the channel formatting *(needs user — real `SLACK_WEBHOOK_URL`)*
+- [x] 6.5 Manually post a hand-written test briefing to verify the channel formatting *(needs user — real `SLACK_WEBHOOK_URL`)*
 
 ## 7. Seen-tracking
 
@@ -65,11 +65,11 @@
 - [x] 8.2 Implement step-level failure isolation (`set -e` plus per-step `||` guards) so any failure skips mark-seen
 - [x] 8.3 Append timestamped log lines for each step start/end and any failure detail to `run.log`
 - [x] 8.4 Prefer `prompts/daily_brief.local.md` over `prompts/daily_brief.md` if the local variant exists
-- [ ] 8.5 Manually run `bash run.sh` end-to-end and confirm the Slack message arrives *(needs user — real `.env`, `config.local.yaml`, `profile.local.yaml`)*
+- [x] 8.5 Manually run `bash run.sh` end-to-end and confirm the Slack message arrives *(needs user — real `.env`, `config.local.yaml`, `profile.local.yaml`)*
 
 ## 9. Sample output and README polish
 
-- [ ] 9.1 Capture one real briefing, anonymize any user-specific content, and save as `samples/example_briefing.md` *(needs user — depends on 8.5)*
+- [x] 9.1 Capture one real briefing, anonymize any user-specific content, and save as `samples/example_briefing.md` *(needs user — depends on 8.5)*
 - [x] 9.2 Flesh out `README.md`: project pitch in JARVIS voice, architecture diagram or ASCII flow, fork-and-setup instructions, configuration reference, the safety contract section (from task 2.4), and the cron-registration snippet
 - [x] 9.3 Cross-link `openspec/specs/` from the README so future contributors find the requirements
 
