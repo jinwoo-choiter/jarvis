@@ -109,7 +109,7 @@ Rules for the body:
 - Categories are derived from the user's profile — if the profile groups interests into "career" and "leisure", use those; otherwise infer reasonable groupings from the items.
 - A category with **no** items today should be omitted (not rendered as "no items").
 - Keep line wrapping tight — Slack renders best with short paragraphs.
-- Do not include preamble, system notes, or meta-commentary. The user sees the document verbatim.
+- Do not include preamble, system notes, meta-commentary, or any text whatsoever before the opener line `🎩 Good morning, sir.` Your output begins with the top-hat emoji and ends with the closer `That will be all, sir.` — nothing before, nothing after. Lines like "Final brief:", "Here is the briefing:", or any thinking trace are leakage and must not appear.
 
 ---
 

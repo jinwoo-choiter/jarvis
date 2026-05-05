@@ -20,6 +20,26 @@ import httpx
 ENV_VAR = "SLACK_WEBHOOK_URL"
 HTTP_TIMEOUT = 30.0
 
+# The synthesis prompt mandates the brief begin with this opener and end with
+# this closer. Models occasionally leak a prefatory line ("Final brief:",
+# thinking-trace, etc.) — `_strip_meta` snips both ends defensively so the
+# user never sees that leakage even when the prompt rule is violated.
+_OPENER_MARKER = "🎩"
+_CLOSER_MARKER = "That will be all, sir."
+
+
+def _strip_meta(briefing: str) -> str:
+    text = briefing
+    lead_idx = text.find(_OPENER_MARKER)
+    if lead_idx > 0:
+        text = text[lead_idx:]
+    closer_idx = text.find(_CLOSER_MARKER)
+    if closer_idx >= 0:
+        end_of_line = text.find("\n", closer_idx + len(_CLOSER_MARKER))
+        if end_of_line >= 0:
+            text = text[: end_of_line + 1]
+    return text
+
 
 def _read_briefing(path: str | None) -> str:
     if path is None or path == "-":
@@ -70,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     if not briefing.strip():
         print("[deliver] briefing is empty; refusing to post", file=sys.stderr)
         return 3
+
+    briefing = _strip_meta(briefing)
 
     try:
         dispatch(briefing, webhook_url)
