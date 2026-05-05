@@ -33,7 +33,7 @@
 
 - [x] 5.1 In a scratch directory, simulate a fresh-clone setup: `git clone <local repo>`, `bash scripts/init.sh` with throwaway values for SLACK_WEBHOOK_URL (`https://example.invalid/x`) and YOUTUBE_API_KEY (`dummy`), decline the smoke test, verify `.env` is mode 600.
 - [x] 5.2 In the same scratch directory, re-run `bash scripts/init.sh`, decline the overwrite prompt, verify `.env` is unchanged.
-- [ ] 5.3 In the actual repository, with the maintainer's real `.env` already populated from the migrated state, run `bash run.sh` once and verify the resulting brief is identical in shape to a brief produced under the previous (layered) configuration model.
+- [x] 5.3 In the actual repository, with the maintainer's real `.env` already populated from the migrated state, run `bash run.sh` once and verify the resulting brief is identical in shape to a brief produced under the previous (layered) configuration model.
 
 ## 6. Maintainer-side cleanup (post-merge)
 
