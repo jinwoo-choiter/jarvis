@@ -120,10 +120,16 @@ else
 fi
 
 # ---- 5. mark-seen (only after successful delivery) -----------------------
+#
+# Mark seen only items whose URL appears in the briefing — items the
+# synthesis filtered out are intentionally left unseen so they can re-surface
+# tomorrow if the user's priorities change.
 
 log "STEP mark-seen start"
-"$PY" -m jarvis.state mark-seen "$RAW_DIR/new.json" 2>>"$LOG_FILE" \
-  || log "WARN mark-seen failed; some items may be re-delivered tomorrow"
+"$PY" -m jarvis.state mark-delivered \
+  --new "$RAW_DIR/new.json" \
+  --briefing "$BRIEFING_FILE" 2>>"$LOG_FILE" \
+  || log "WARN mark-delivered failed; some items may be re-delivered tomorrow"
 log "STEP mark-seen done"
 
 log "RUN ok"

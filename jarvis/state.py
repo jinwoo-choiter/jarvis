@@ -7,11 +7,14 @@ Workflow:
     init_db()                              -- idempotent
     new_envelope = dedupe(envelopes)       -- emits items absent from the store
     mark_seen(items)                       -- only after delivery succeeds
+    mark_delivered(new_envelope, brief)    -- marks only items whose URL appears
+                                              in the delivered briefing text
 
 CLI usage (driven by run.sh):
-    python -m jarvis.state dedupe <path>...        > /tmp/raw/new.json
-    python -m jarvis.state mark-seen [<path>]      # reads stdin if no path
-    python -m jarvis.state init-db                 # rare; auto-run by other commands
+    python -m jarvis.state dedupe <path>...                    > /tmp/raw/new.json
+    python -m jarvis.state mark-seen [<path>]                  # reads stdin if no path
+    python -m jarvis.state mark-delivered --new <new.json> --briefing <brief.md>
+    python -m jarvis.state init-db                             # rare; auto-run by other commands
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -158,6 +162,48 @@ def mark_seen(envelope: dict[str, Any]) -> int:
         return cur.rowcount if cur.rowcount is not None else 0
 
 
+# Match http(s) URLs in markdown / plain text. Stops at whitespace and common
+# closing punctuation; trailing soft punctuation is stripped below.
+_URL_RE = re.compile(r"https?://[^\s)\]>'\"<]+")
+_URL_TRAILING = ".,;:!?'\")]"
+
+
+def _extract_urls(text: str) -> set[str]:
+    urls: set[str] = set()
+    for match in _URL_RE.findall(text):
+        urls.add(match.rstrip(_URL_TRAILING))
+    return urls
+
+
+def mark_delivered(
+    new_envelope: dict[str, Any], briefing_text: str
+) -> tuple[int, int, int]:
+    """Mark seen only those items in `new_envelope` whose URL appears in
+    `briefing_text` (i.e., items the synthesis actually surfaced).
+
+    Returns (matched, newly_recorded, dropped):
+      matched         items in new_envelope whose URL appears in briefing_text
+      newly_recorded  rows actually inserted (matched minus already-seen)
+      dropped         items in new_envelope not present in briefing_text
+    """
+    init_db()
+    delivered_hashes = {url_hash(u) for u in _extract_urls(briefing_text)}
+
+    matched_items: list[dict[str, Any]] = []
+    dropped = 0
+    for item in new_envelope.get("items", []) or []:
+        url = (item.get("url") or "").strip()
+        if not url:
+            continue
+        if url_hash(url) in delivered_hashes:
+            matched_items.append(item)
+        else:
+            dropped += 1
+
+    newly_recorded = mark_seen({"items": matched_items})
+    return len(matched_items), newly_recorded, dropped
+
+
 def _load_envelopes_from_paths(paths: list[str]) -> list[dict[str, Any]]:
     envelopes: list[dict[str, Any]] = []
     for path in paths:
@@ -196,6 +242,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Envelope JSON path; reads stdin if omitted or '-'.",
     )
 
+    p_delivered = sub.add_parser(
+        "mark-delivered",
+        help="Mark seen only items in --new whose URL appears in --briefing.",
+    )
+    p_delivered.add_argument(
+        "--new",
+        dest="new_path",
+        required=True,
+        help="Path to the dedupe envelope (typically /tmp/raw/new.json).",
+    )
+    p_delivered.add_argument(
+        "--briefing",
+        dest="briefing_path",
+        required=True,
+        help="Path to the briefing markdown delivered to the user.",
+    )
+
     args = parser.parse_args(argv)
 
     if args.cmd == "init-db":
@@ -213,6 +276,19 @@ def main(argv: list[str] | None = None) -> int:
         envelope = _load_envelope_from_path_or_stdin(args.path)
         n = mark_seen(envelope)
         print(f"[state] marked {n} item(s) as seen", file=sys.stderr)
+        return 0
+
+    if args.cmd == "mark-delivered":
+        with open(args.new_path, "r", encoding="utf-8") as f:
+            new_envelope = json.load(f)
+        with open(args.briefing_path, "r", encoding="utf-8") as f:
+            briefing_text = f.read()
+        matched, newly, dropped = mark_delivered(new_envelope, briefing_text)
+        print(
+            f"[state] delivered={matched} (newly recorded {newly}), "
+            f"dropped={dropped} not-in-briefing",
+            file=sys.stderr,
+        )
         return 0
 
     return 2
