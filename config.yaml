@@ -1,18 +1,39 @@
-# Committed defaults. Safe to read by anyone.
-# User-specific overrides live in `config.local.yaml` (gitignored).
-# When both are present, `config.local.yaml` wins on a per-key basis.
+# Tracked configuration. Edit in place; commit your changes.
+# Secrets (Slack webhook, YouTube API key) live in `.env` (gitignored)
+# and are populated by `bash scripts/init.sh`.
 
 arxiv:
-  # arXiv categories to include in the daily brief.
-  # `cs.RO` (Robotics) is the v1 reference category.
-  # Add or replace categories in `config.local.yaml`.
+  # arXiv categories the fetcher should include in the deterministic brief.
   categories:
-    - cs.RO
+    - cs.RO       # Robotics — primary
+    - eess.SY     # Systems and control — humanoid whole-body control, MPC, etc.
 
 youtube:
   # Channel IDs (the `UC...` form, not the @handle).
-  # Leave empty in the committed default; populate in `config.local.yaml`.
-  channels: []
+  # Resolve a handle → ID via the YouTube Data API:
+  #   GET /youtube/v3/channels?forHandle=@<handle>&part=id
+  channels:
+    # --- Humanoid platform companies (official) ---
+    - "UC7vVhkEfw4nOGp8TyDk7RcQ"   # Boston Dynamics
+    - "UCYlq-KmwPjc1DtsGmthFqSQ"   # Figure
+    - "UCN-StetwWuVYf-MU2_NVj4A"   # Agility Robotics (Digit)
+    - "UC2o3l9J6GL8kGRe_0Po5SCA"   # 1X Technologies
+    - "UCycW2e4kfthDvNuOrm8xVRQ"   # Apptronik (Apollo)
+    - "UC_d_dGoi2ztmAgiDwRh3uJw"   # Sanctuary AI
+    - "UCsMbp4V8oxzHCMdOUP-3oWw"   # Unitree Robotics
+    - "UCyGZl0ZMc7HXSjby-SA6KEA"   # Fourier Intelligence
+    - "UCdYzpvcdKkvlfTc-Abe6cJQ"   # UBTECH Robotics
+    - "UC5WjFrtBdufl6CZojX3D8dQ"   # Tesla (Optimus appears here)
+
+    # --- Robot hand / dexterous manipulation (official) ---
+    - "UCOsoyW4KUVfdL2grmpk0YJw"   # Shadow Robot Company
+    - "UCPr5M7Nwqkx1QNAzc71nV-g"   # Wonik Robotics (Allegro Hand)
+    - "UC_mcesaFBFyZGeyet24Pusg"   # SCHUNK
+    - "UCAuEvRfpMDCqtGL0cuVbmyA"   # PSYONIC (Ability Hand)
+    - "UCIqaqrswi0XnyiBU6ti_17g"   # Sharpa
+
+    # --- Industry-trend / unofficial coverage ---
+    # Add analyst / news channels here.
 
 schedule:
   # Recommended cron schedule. The user registers cron themselves;
@@ -29,3 +50,48 @@ window:
   # These cadences are weekly at best — a 24h heuristic window is almost
   # always empty.
   heuristic_hours: 168
+
+# Free-form keyword themes for the synthesis prompt's web_search step.
+# These are read by the prompt, not by the Python fetchers — they're hints
+# for an LLM tool call, so natural-language phrasing works better than tags.
+search_themes:
+  career:
+    # Humanoid platforms & releases
+    - "humanoid robot announcement"
+    - "humanoid platform release"
+    # Whole-body control & control stacks
+    - "humanoid whole-body control"
+    - "real-time robot control framework"
+    - "humanoid balancing locomotion benchmark"
+    # SW frameworks / platforms
+    - "robot software framework release"
+    - "MuJoCo humanoid simulation"
+    - "Isaac Lab humanoid"
+    # Dexterous hands
+    - "dexterous robot hand release"
+    - "robot hand teleoperation demo"
+    # Competitor moves
+    - "humanoid robotics company funding"
+    - "humanoid robot factory deployment"
+
+  leisure:
+    # BLACKPINK — never miss a ticketing window
+    - "BLACKPINK concert ticket announcement"
+    - "BLACKPINK world tour"
+    - "BLACKPINK Seoul concert"
+    - "블랙핑크 콘서트 예매"
+    # 성시경
+    - "성시경 콘서트 일정"
+    - "성시경 단독 콘서트 예매"
+    - "성시경 팬콘"
+    # Disney parks worldwide — anniversaries, new attractions, openings
+    - "Walt Disney World new attraction"
+    - "Disneyland Resort Anaheim new attraction"
+    - "Disneyland Paris new attraction"
+    - "Tokyo Disney Resort new attraction"
+    - "Hong Kong Disneyland new attraction"
+    - "Shanghai Disney Resort new attraction"
+    - "Disneyland Abu Dhabi opening"
+    - "Dubai Disneyland announcement"
+    - "Disney park anniversary event"
+    - "Disney theme park ride opening date"

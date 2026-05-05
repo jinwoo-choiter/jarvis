@@ -1,7 +1,5 @@
-# --- secrets / personal context (NEVER commit) ---
+# --- secrets (NEVER commit) ---
 .env
-*.local.yaml
-prompts/*.local.md
 
 # --- generated state ---
 state/seen.sqlite

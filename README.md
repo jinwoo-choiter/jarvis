@@ -16,7 +16,7 @@ run.sh ──▶ jarvis.fetchers.* ──▶ jarvis.state (dedupe) ──▶ cla
                 │                       ▲                    │
                 │                       │                    │
                 └───── /tmp/raw/*.json ─┘             prompts/daily_brief.md
-                                                      profile.local.yaml
+                                                      profile.yaml
                                                       web_search (Claude Code)
 
                               on success: jarvis.state (mark-seen) ──▶ state/seen.sqlite
@@ -29,7 +29,7 @@ run.sh ──▶ jarvis.fetchers.* ──▶ jarvis.state (dedupe) ──▶ cla
 
 ## Fork & set up
 
-JARVIS is designed to be forked. The committed repo contains no real secrets, no real channel IDs, and no personal context — every user-specific value lives in `*.local.*` files that are gitignored.
+JARVIS is designed to be forked. The repo tracks the maintainer's actual configuration (channel list, search themes, profile) so a fresh clone runs end-to-end as soon as `.env` is populated. Only secrets — Slack webhook URL and YouTube API key — live in a gitignored `.env`.
 
 ### Prerequisites
 
@@ -52,39 +52,43 @@ JARVIS is designed to be forked. The committed repo contains no real secrets, no
    ```bash
    pre-commit install
    ```
-4. Copy the templates and fill in real values:
+4. Populate `.env` interactively:
    ```bash
-   cp .env.example .env
-   cp config.local.yaml.example config.local.yaml
-   cp profile.example.yaml profile.local.yaml
+   bash scripts/init.sh
    ```
-   - `.env`: your Slack webhook URL and YouTube API key.
-   - `config.local.yaml`: arXiv categories, YouTube channel IDs, and `web_search` keyword themes.
-   - `profile.local.yaml`: your role, priority keywords, and upcoming events. The synthesis prompt reads this so it can bias categorization toward what you care about.
-5. Optionally write a personal augmentation for the synthesis prompt at `prompts/daily_brief.local.md` (also gitignored). When present, the orchestrator prefers the local variant.
-6. Verify end-to-end manually:
+   The script reads `.env.example`, prompts for each variable (with the example file's leading comment shown as help text), masks input for keys that look secret-shaped, writes `.env` with mode 600, and offers an opt-in Slack smoke test that posts a labelled `[JARVIS init]` setup notice via the webhook so a typo is caught at setup time rather than at the next scheduled run.
+5. Verify end-to-end manually:
    ```bash
    bash run.sh
    ```
    You should see a Slack message in the channel bound to your webhook.
-7. Schedule it. Add the line below to your crontab via `crontab -e`:
+6. Schedule it. Add the line below to your crontab via `crontab -e`:
    ```
    0 7 * * * /full/absolute/path/to/jarvis/run.sh
    ```
 
+### If you forked this repo
+
+The committed `config.yaml` and `profile.yaml` reflect the maintainer's setup, not yours. Before your first run:
+
+- Edit `config.yaml`:
+  - `arxiv.categories` — pick the arXiv categories that match your interests (e.g., `cs.LG` instead of `cs.RO`).
+  - `youtube.channels` — replace the maintainer's `UC...` channel list with yours. Resolve handles via `https://www.googleapis.com/youtube/v3/channels?forHandle=@<handle>&part=id&key=$YOUTUBE_API_KEY`.
+  - `search_themes.career` and `search_themes.leisure` — phrase these as natural-language queries; they feed Claude Code's `web_search` tool.
+- Edit `profile.yaml`:
+  - `role` — one or two sentences on what you do, used by the synthesis prompt to bias categorization.
+  - `priority_keywords` — terms that should boost an item's rank.
+  - `upcoming_events` — absolute-dated events you want surrounding signal for (concert ticketing windows, conferences, trips).
+
 ## Configuration reference
 
-| File                            | Committed? | Purpose                                                              |
-| ------------------------------- | :--------: | -------------------------------------------------------------------- |
-| `config.yaml`                   |     ✅     | Safe defaults (e.g. `cs.RO` only).                                   |
-| `config.local.yaml.example`     |     ✅     | Template a forker copies.                                            |
-| `config.local.yaml`             |     ❌     | Your real source list. Overrides `config.yaml` per-key.              |
-| `profile.example.yaml`          |     ✅     | Template for the user-context profile.                               |
-| `profile.local.yaml`            |     ❌     | Your real role, priority keywords, upcoming events.                  |
-| `prompts/daily_brief.md`        |     ✅     | Generic synthesis prompt.                                            |
-| `prompts/daily_brief.local.md`  |     ❌     | Optional personal augmentation. When present, used in place of the committed prompt. |
-| `.env.example`                  |     ✅     | Variable names only.                                                 |
-| `.env`                          |     ❌     | Your real Slack webhook URL and YouTube API key.                     |
+| File                            | Tracked? | Purpose                                                              |
+| ------------------------------- | :------: | -------------------------------------------------------------------- |
+| `config.yaml`                   |    ✅    | Sources, search themes, scheduling, lookback windows.                |
+| `profile.yaml`                  |    ✅    | Your role, priority keywords, upcoming events, output language.      |
+| `prompts/daily_brief.md`        |    ✅    | Synthesis prompt the headless Claude Code call runs.                 |
+| `.env.example`                  |    ✅    | Documented manifest of secrets the init script prompts for.          |
+| `.env`                          |    ❌    | Your real Slack webhook URL and YouTube API key. Populate via `scripts/init.sh`. |
 
 ## Public-repo safety contract
 
@@ -92,7 +96,7 @@ If you push your fork to a public GitHub repo (or this upstream is mirrored), th
 
 The repo ships three independent defenses:
 
-1. **`.gitignore`** covers every secret-bearing and ephemeral path: `.env`, `*.local.yaml`, `prompts/*.local.md`, `state/seen.sqlite`, `run.log`, `__pycache__/`, `.venv/`, `/tmp/raw/`, `/tmp/briefing.md`.
+1. **`.gitignore`** covers every secret-bearing and ephemeral path: `.env`, `state/seen.sqlite`, `run.log`, `__pycache__/`, `.venv/`, `/tmp/raw/`, `/tmp/briefing.md`. `config.yaml` and `profile.yaml` are intentionally tracked — they hold non-secret configuration.
 2. **`pre-commit` secret scanner** (`gitleaks`) runs on every commit. Run `pre-commit install` once after cloning so the hook is wired up.
 3. **GitHub Push Protection** — enable it in your fork's **Settings → Code security → Push protection** before your first push.
 
@@ -101,7 +105,7 @@ The repo ships three independent defenses:
 Run before your *first* `git push`:
 
 ```bash
-git status                       # No *.local.*, .env, state/seen.sqlite, run.log, /tmp/* should appear.
+git status                       # No .env, state/seen.sqlite, run.log, /tmp/* should appear.
 git diff --cached                # Skim every line.
 git diff --cached | grep -Ei 'hooks\.slack\.com|AIza|sk-ant-|ghp_|sk-|xox[baprs]-'
                                  # Should produce zero matches.
