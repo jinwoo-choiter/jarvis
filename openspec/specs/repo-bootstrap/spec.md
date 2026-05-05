@@ -1,45 +1,55 @@
 ## Purpose
 
-The committed project layout, two-tier configuration layering (.example vs .local.*), and gitignore guarantees that keep this repository safe to fork in public.
+The committed project layout, the single-tier configuration model (non-secret config tracked in git, secrets in `.env`), and gitignore guarantees that keep this repository safe to fork in public.
 
 ## Requirements
 
 ### Requirement: Project directory layout
 
-The repository SHALL contain the following committed top-level structure: a `jarvis/` Python package (with a `fetchers/` subpackage, `state.py`, `deliver.py`), a `prompts/` directory, a `samples/` directory, a `state/` directory containing only a `.gitkeep`, a `run.sh` entry point, a `pyproject.toml` manifest, a `README.md`, a `LICENSE` file, and the configuration template files defined in the configuration-layering requirement below.
+The repository SHALL contain the following committed top-level structure: a `jarvis/` Python package (with a `fetchers/` subpackage, `state.py`, `deliver.py`), a `prompts/` directory, a `samples/` directory, a `scripts/` directory, a `state/` directory containing only a `.gitkeep`, a `run.sh` entry point, a `pyproject.toml` manifest, a `README.md`, a `LICENSE` file, and the configuration files defined in the tracked-configuration requirement below.
 
-#### Scenario: Fresh clone exposes the v1 layout
+#### Scenario: Fresh clone exposes the layout
 
 - **WHEN** a user clones the repository
-- **THEN** the working tree contains `jarvis/__init__.py`, `jarvis/fetchers/__init__.py`, `jarvis/fetchers/arxiv.py`, `jarvis/fetchers/youtube.py`, `jarvis/state.py`, `jarvis/deliver.py`, `prompts/daily_brief.md`, `samples/example_briefing.md`, `state/.gitkeep`, `run.sh`, `pyproject.toml`, `README.md`, and `LICENSE`
+- **THEN** the working tree contains `jarvis/__init__.py`, `jarvis/fetchers/__init__.py`, `jarvis/fetchers/arxiv.py`, `jarvis/fetchers/youtube.py`, `jarvis/state.py`, `jarvis/deliver.py`, `prompts/daily_brief.md`, `samples/example_briefing.md`, `scripts/init.sh`, `state/.gitkeep`, `run.sh`, `config.yaml`, `profile.yaml`, `.env.example`, `pyproject.toml`, `README.md`, and `LICENSE`
 
 #### Scenario: State directory is preserved but empty
 
 - **WHEN** a user clones the repository
 - **THEN** `state/` exists, contains only `.gitkeep`, and `state/seen.sqlite` is absent from the working tree
 
-### Requirement: Two-tier configuration layering
+### Requirement: Tracked configuration with secrets in environment
 
-The system SHALL separate configuration into committed templates (`*.example` files) and user-local overrides (`*.local.*` files). Committed files MUST NOT contain real secrets, real API keys, real channel identifiers, or real personal context. The committed templates MUST include `.env.example`, `config.yaml`, `config.local.yaml.example`, and `profile.example.yaml`. The user-local files (`.env`, `config.local.yaml`, `profile.local.yaml`, and optional `prompts/daily_brief.local.md`) MUST be ignored by git.
+The system SHALL keep all non-secret configuration in committed files and SHALL keep secrets in an `.env` file that is gitignored. The committed configuration files MUST be `config.yaml` (data sources, search themes, scheduling, windows) and `profile.yaml` (the user's role, priority keywords, upcoming events, output language). Secrets MUST be limited to credentials that grant external access — at present the Slack incoming-webhook URL and the YouTube Data API key. The repository SHALL ship `.env.example` as a documented manifest of expected environment variables, with one `KEY=` line per variable and a leading `#` comment on each describing its purpose.
 
-#### Scenario: User adopts the configuration
+#### Scenario: Pipeline reads only the tracked config files
 
-- **WHEN** a user copies `.env.example` to `.env`, `config.local.yaml.example` to `config.local.yaml`, and `profile.example.yaml` to `profile.local.yaml`, and fills in real values
-- **THEN** the pipeline can run end-to-end using only those local files, without modifying any committed file
+- **WHEN** the pipeline runs in a working tree where `config.local.yaml` and `profile.local.yaml` do not exist
+- **THEN** every fetcher and the synthesis prompt operate on `config.yaml` and `profile.yaml` and the run completes successfully
 
-#### Scenario: Templates contain no real values
+#### Scenario: Secrets are not in any tracked file
 
-- **WHEN** any reviewer inspects `.env.example`, `config.yaml`, `config.local.yaml.example`, or `profile.example.yaml`
-- **THEN** every value is either an empty string, a documented placeholder, or a generic non-sensitive default
+- **WHEN** any reviewer inspects every committed file in the repository
+- **THEN** no real Slack webhook URL, no real YouTube API key, and no other credential value appears anywhere outside `.env.example`'s placeholder positions
+
+#### Scenario: `.env.example` is well-formed
+
+- **WHEN** any reviewer reads `.env.example`
+- **THEN** every line is either blank, a `#`-prefixed comment, or a `KEY=` assignment with an empty or placeholder value
 
 ### Requirement: gitignore covers all secret-bearing and ephemeral paths
 
-The committed `.gitignore` SHALL list at minimum: `.env`, `*.local.yaml`, `prompts/*.local.md`, `state/seen.sqlite`, `run.log`, `__pycache__/`, `.venv/`, `/tmp/raw/`, and `/tmp/briefing.md`.
+The committed `.gitignore` SHALL list at minimum: `.env`, `state/seen.sqlite`, `run.log`, `__pycache__/`, `.venv/`, `/tmp/raw/`, and `/tmp/briefing.md`. The gitignore SHALL NOT list `config.yaml`, `profile.yaml`, or any `*.local.*` pattern.
 
-#### Scenario: User-local files are not tracked
+#### Scenario: Secrets file is not tracked
 
-- **WHEN** a user creates `.env`, `config.local.yaml`, `profile.local.yaml`, or `prompts/daily_brief.local.md` with real values
-- **THEN** `git status` does not list these files as untracked or modified
+- **WHEN** a user populates `.env` with their Slack webhook URL and YouTube API key
+- **THEN** `git status` does not list `.env`
+
+#### Scenario: Tracked config files are tracked
+
+- **WHEN** a user edits `config.yaml` or `profile.yaml` to their own values
+- **THEN** `git status` lists the edits as modifications and `git add` stages them normally
 
 #### Scenario: Generated state and ephemeral artifacts are not tracked
 
