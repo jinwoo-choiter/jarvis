@@ -7,8 +7,8 @@
 #
 # Required setup (see README):
 #   - .env with SLACK_WEBHOOK_URL and YOUTUBE_API_KEY
-#   - config.local.yaml with arXiv categories and YouTube channel IDs
-#   - profile.local.yaml with the user-context profile
+#   - config.yaml with arXiv categories, YouTube channel IDs, search themes
+#   - profile.yaml with the user-context profile
 #   - Claude Code CLI installed and signed in (`claude` on PATH)
 #
 set -uo pipefail
@@ -19,6 +19,7 @@ cd "$REPO_ROOT"
 LOG_FILE="$REPO_ROOT/run.log"
 RAW_DIR="/tmp/raw"
 BRIEFING_FILE="/tmp/briefing.md"
+ARCHIVE_DIR="$REPO_ROOT/state/briefings"
 PROMPT_FILE="$REPO_ROOT/prompts/daily_brief.md"
 PROMPT_LOCAL="$REPO_ROOT/prompts/daily_brief.local.md"
 
@@ -57,6 +58,19 @@ command -v claude >/dev/null 2>&1 || die "claude CLI is not on PATH"
 
 mkdir -p "$RAW_DIR"
 
+# ---- read dedup tunables from config.yaml --------------------------------
+
+DEDUP_RECENT_DAYS="$("$PY" -c '
+import yaml, sys
+c = yaml.safe_load(open("config.yaml")) or {}
+print(int(c.get("dedup", {}).get("recent_days", 14)))
+')"
+DEDUP_RECENT_BRIEFS="$("$PY" -c '
+import yaml, sys
+c = yaml.safe_load(open("config.yaml")) or {}
+print(int(c.get("dedup", {}).get("recent_briefs_count", 14)))
+')"
+
 # ---- 1. fetchers ----------------------------------------------------------
 
 log "STEP fetchers start"
@@ -85,7 +99,27 @@ log "STEP dedupe start"
 NEW_COUNT="$("$PY" -c 'import json,sys; print(len(json.load(open("'"$RAW_DIR/new.json"'"))["items"]))')"
 log "STEP dedupe done (new=$NEW_COUNT)"
 
-# ---- 3. synthesis ---------------------------------------------------------
+# ---- 3. stage cross-day context for synthesis ----------------------------
+
+log "STEP cross-day-context start"
+"$PY" -m jarvis.state export-seen-recent \
+  --days "$DEDUP_RECENT_DAYS" \
+  --out "$RAW_DIR/seen_recent.txt" 2>>"$LOG_FILE" \
+  || log "WARN export-seen-recent failed; deny-list will be empty"
+
+# Stage the most recent N archived briefings for cross-day duplicate detection.
+rm -rf "$RAW_DIR/recent_briefs"
+mkdir -p "$RAW_DIR/recent_briefs"
+if compgen -G "$ARCHIVE_DIR/*.md" > /dev/null; then
+  # ls -t sorts newest first; head limits to N most recent.
+  ls -t "$ARCHIVE_DIR"/*.md 2>/dev/null \
+    | head -n "$DEDUP_RECENT_BRIEFS" \
+    | xargs -I{} cp {} "$RAW_DIR/recent_briefs/" 2>>"$LOG_FILE"
+fi
+RECENT_BRIEFS_COUNT="$(ls "$RAW_DIR/recent_briefs"/*.md 2>/dev/null | wc -l | tr -d ' ')"
+log "STEP cross-day-context done (deny-list, recent_briefs=$RECENT_BRIEFS_COUNT)"
+
+# ---- 4. synthesis ---------------------------------------------------------
 
 if [[ -f "$PROMPT_LOCAL" ]]; then
   PROMPT_PATH="$PROMPT_LOCAL"
@@ -110,20 +144,35 @@ if [[ ! -s "$BRIEFING_FILE" ]]; then
 fi
 log "STEP synthesis done ($(wc -c <"$BRIEFING_FILE" | tr -d ' ') bytes)"
 
-# ---- 4. delivery ----------------------------------------------------------
+# ---- 5. delivery ----------------------------------------------------------
 
 log "STEP delivery start"
 if "$PY" -m jarvis.deliver --quiet "$BRIEFING_FILE" 2>>"$LOG_FILE"; then
   log "STEP delivery done"
 else
-  die "delivery failed — skipping mark-seen so items can be retried tomorrow"
+  die "delivery failed — skipping archive and mark-seen so items can be retried tomorrow"
 fi
 
-# ---- 5. mark-seen (only after successful delivery) -----------------------
+# ---- 6. archive the brief (only after successful delivery) ---------------
 #
-# Mark seen only items whose URL appears in the briefing — items the
-# synthesis filtered out are intentionally left unseen so they can re-surface
-# tomorrow if the user's priorities change.
+# Persist today's brief so the synthesis prompt can read recent days as
+# cross-day duplicate-detection context on subsequent runs. Archive failure
+# is non-fatal — mark-delivered still runs.
+
+log "STEP archive-brief start"
+mkdir -p "$ARCHIVE_DIR"
+ARCHIVE_PATH="$ARCHIVE_DIR/$(date '+%Y-%m-%d').md"
+if cp "$BRIEFING_FILE" "$ARCHIVE_PATH" 2>>"$LOG_FILE"; then
+  log "STEP archive-brief done ($ARCHIVE_PATH)"
+else
+  log "WARN archive-brief failed; cross-day context for tomorrow will lack today's brief"
+fi
+
+# ---- 7. mark-seen (only after successful delivery) -----------------------
+#
+# Mark seen every URL that appears in the brief — fetcher items get their
+# native category (arxiv, youtube), web_search-sourced URLs get category
+# `web` so the deny-list catches them on subsequent runs.
 
 log "STEP mark-seen start"
 "$PY" -m jarvis.state mark-delivered \

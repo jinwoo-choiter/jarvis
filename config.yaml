@@ -53,6 +53,16 @@ window:
   # always empty.
   heuristic_hours: 168
 
+dedup:
+  # How many days of seen URLs the synthesis prompt receives as a deny-list.
+  # `web_search` results matching any URL on this list are dropped silently.
+  recent_days: 14
+  # How many recent archived briefings the synthesis prompt reads as
+  # cross-day context. Lets the model recognise same-event-different-source
+  # duplication (e.g., the same Disney attraction announced via two outlets
+  # on different days). Token cost ~3 KB per brief; default fits comfortably.
+  recent_briefs_count: 14
+
 # Free-form keyword themes for the synthesis prompt's web_search step.
 # These are read by the prompt, not by the Python fetchers — they're hints
 # for an LLM tool call, so natural-language phrasing works better than tags.

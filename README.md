@@ -70,6 +70,15 @@ The synthesis prompt distinguishes *news-style* items (article publication date 
 
 A failed delivery does *not* advance `mark-delivered`. The next run sees the same items as new and gets another chance. Recoverability over double-posting.
 
+### Brief archive and cross-day dedup
+
+On every successful delivery, `run.sh` copies the brief to `state/briefings/<YYYY-MM-DD>.md` (gitignored, one ~3 KB file per day, ~1 MB per year). Two side benefits:
+
+- The synthesis prompt reads the most recent `dedup.recent_briefs_count` archived briefings on each subsequent run, so it can recognise when a `web_search` result describes an event already covered (different URL, same event) and either drop it or surface a `[update]`-prefixed follow-up if there is genuinely new development.
+- `jarvis.state export-seen-recent` writes a flat list of URLs delivered within the last `dedup.recent_days` days to `/tmp/raw/seen_recent.txt`; the synthesis prompt treats this as a strict deny-list for `web_search` results, so an exact-URL repeat never makes it back into the brief.
+
+Defaults in `config.yaml.dedup`: `recent_days: 14`, `recent_briefs_count: 14`. The two windows are aligned at fourteen days so cross-day dedup reasons over a single time scale.
+
 ## Fork & set up
 
 JARVIS is designed to be forked. The repo tracks the maintainer's actual configuration (channel list, search themes, profile) so a fresh clone runs end-to-end as soon as `.env` is populated. Only secrets — Slack webhook URL and YouTube API key — live in a gitignored `.env`.

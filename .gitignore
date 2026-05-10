@@ -6,6 +6,7 @@ state/seen.sqlite
 state/seen.sqlite-journal
 state/seen.sqlite-wal
 state/seen.sqlite-shm
+state/briefings/
 run.log
 
 # --- ephemeral pipeline artifacts ---

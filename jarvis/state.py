@@ -1,20 +1,31 @@
 """SQLite seen-item store.
 
 Schema:
-    seen(url_hash TEXT PRIMARY KEY, first_seen TIMESTAMP NOT NULL, category TEXT)
+    seen(
+        url_hash   TEXT PRIMARY KEY,
+        first_seen TEXT NOT NULL,
+        category   TEXT,
+        url        TEXT NOT NULL DEFAULT ''   -- the original URL, used by export-seen-recent
+    )
+
+Categories include `arxiv`, `youtube` (derived from fetcher item ids), and the
+sentinel `web` for URLs that appeared in the delivered brief without coming
+through any fetcher (i.e., `web_search` results surfaced by the synthesis prompt).
 
 Workflow:
-    init_db()                              -- idempotent
+    init_db()                              -- idempotent; forward-migrates legacy DBs
     new_envelope = dedupe(envelopes)       -- emits items absent from the store
     mark_seen(items)                       -- only after delivery succeeds
-    mark_delivered(new_envelope, brief)    -- marks only items whose URL appears
-                                              in the delivered briefing text
+    mark_delivered(new_envelope, brief)    -- records every URL in the brief; items
+                                              not in the envelope are tagged `web`
+    export_seen_recent(out, days)          -- flat URL list for the synthesis deny-list
 
 CLI usage (driven by run.sh):
-    python -m jarvis.state dedupe <path>...                    > /tmp/raw/new.json
-    python -m jarvis.state mark-seen [<path>]                  # reads stdin if no path
+    python -m jarvis.state dedupe <path>...                          > /tmp/raw/new.json
+    python -m jarvis.state mark-seen [<path>]                        # reads stdin if no path
     python -m jarvis.state mark-delivered --new <new.json> --briefing <brief.md>
-    python -m jarvis.state init-db                             # rare; auto-run by other commands
+    python -m jarvis.state export-seen-recent --days N --out <path>  # writes deny-list
+    python -m jarvis.state init-db                                   # rare; auto-run by other commands
 """
 
 from __future__ import annotations
@@ -72,10 +83,15 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS seen (
                 url_hash   TEXT PRIMARY KEY,
                 first_seen TEXT NOT NULL,
-                category   TEXT
+                category   TEXT,
+                url        TEXT NOT NULL DEFAULT ''
             )
             """
         )
+        # Forward-migrate older databases that predate the `url` column.
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(seen)").fetchall()]
+        if "url" not in cols:
+            conn.execute("ALTER TABLE seen ADD COLUMN url TEXT NOT NULL DEFAULT ''")
 
 
 def _existing_hashes(conn: sqlite3.Connection, hashes: set[str]) -> set[str]:
@@ -139,7 +155,7 @@ def mark_seen(envelope: dict[str, Any]) -> int:
     """
     init_db()
     now = _now_utc_iso()
-    rows: list[tuple[str, str, str | None]] = []
+    rows: list[tuple[str, str, str | None, str]] = []
     for item in envelope.get("items", []) or []:
         url = (item.get("url") or "").strip()
         if not url:
@@ -148,14 +164,14 @@ def mark_seen(envelope: dict[str, Any]) -> int:
         item_id = item.get("id") or ""
         if isinstance(item_id, str) and ":" in item_id:
             category = item_id.split(":", 1)[0]
-        rows.append((url_hash(url), now, category))
+        rows.append((url_hash(url), now, category, url))
 
     if not rows:
         return 0
 
     with _connect() as conn:
         cur = conn.executemany(
-            "INSERT OR IGNORE INTO seen(url_hash, first_seen, category) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO seen(url_hash, first_seen, category, url) VALUES (?, ?, ?, ?)",
             rows,
         )
         conn.commit()
@@ -177,31 +193,74 @@ def _extract_urls(text: str) -> set[str]:
 
 def mark_delivered(
     new_envelope: dict[str, Any], briefing_text: str
-) -> tuple[int, int, int]:
-    """Mark seen only those items in `new_envelope` whose URL appears in
-    `briefing_text` (i.e., items the synthesis actually surfaced).
+) -> tuple[int, int, int, int]:
+    """Mark seen every URL extracted from the delivered `briefing_text`.
 
-    Returns (matched, newly_recorded, dropped):
-      matched         items in new_envelope whose URL appears in briefing_text
-      newly_recorded  rows actually inserted (matched minus already-seen)
-      dropped         items in new_envelope not present in briefing_text
+    URLs whose hash matches an item in `new_envelope` are recorded with that
+    item's category (`arxiv`, `youtube`, ...). URLs in the brief that do not
+    match any envelope item are recorded with category `web` so the synthesis
+    deny-list can include `web_search`-sourced URLs on subsequent runs.
+
+    Returns (matched, web, newly_recorded, dropped):
+      matched         envelope items whose URL appears in briefing_text
+      web             URLs in briefing_text that were NOT in new_envelope
+      newly_recorded  rows actually inserted (matched + web, minus already-seen)
+      dropped         envelope items NOT in briefing_text (synthesis filtered them)
     """
     init_db()
-    delivered_hashes = {url_hash(u) for u in _extract_urls(briefing_text)}
+    delivered_urls = _extract_urls(briefing_text)
+    delivered_hashes = {url_hash(u) for u in delivered_urls}
 
     matched_items: list[dict[str, Any]] = []
+    matched_hashes: set[str] = set()
     dropped = 0
     for item in new_envelope.get("items", []) or []:
         url = (item.get("url") or "").strip()
         if not url:
             continue
-        if url_hash(url) in delivered_hashes:
+        h = url_hash(url)
+        if h in delivered_hashes:
             matched_items.append(item)
+            matched_hashes.add(h)
         else:
             dropped += 1
 
-    newly_recorded = mark_seen({"items": matched_items})
-    return len(matched_items), newly_recorded, dropped
+    # Web items: every brief URL whose hash didn't match an envelope item.
+    # Synthesise minimal items so mark_seen records them with category=web.
+    web_items: list[dict[str, Any]] = [
+        {"id": "web:url", "url": u}
+        for u in sorted(delivered_urls)
+        if url_hash(u) not in matched_hashes
+    ]
+
+    newly_recorded = mark_seen({"items": matched_items + web_items})
+    return len(matched_items), len(web_items), newly_recorded, dropped
+
+
+def export_seen_recent(out_path: str, days: int) -> int:
+    """Write a flat list of URLs seen within the last `days` to `out_path`.
+
+    One URL per line, sorted, no header. Rows whose `url` is empty (legacy
+    rows recorded before the schema gained the column) are skipped — they
+    cannot reach the prompt as a deny-list anyway.
+
+    Returns the number of URLs written.
+    """
+    init_db()
+    cutoff = (
+        dt.datetime.now(tz=dt.timezone.utc) - dt.timedelta(days=days)
+    ).isoformat().replace("+00:00", "Z")
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT url FROM seen WHERE first_seen >= ? AND url != '' ORDER BY url",
+            (cutoff,),
+        ).fetchall()
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as f:
+        for (u,) in rows:
+            f.write(u + "\n")
+    return len(rows)
 
 
 def _load_envelopes_from_paths(paths: list[str]) -> list[dict[str, Any]]:
@@ -259,6 +318,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the briefing markdown delivered to the user.",
     )
 
+    p_export = sub.add_parser(
+        "export-seen-recent",
+        help="Write the recently-seen URL deny-list to disk.",
+    )
+    p_export.add_argument(
+        "--days",
+        type=int,
+        default=14,
+        help="Lookback window in days (default 14).",
+    )
+    p_export.add_argument(
+        "--out",
+        dest="out_path",
+        required=True,
+        help="Output path (one URL per line, sorted, no header).",
+    )
+
     args = parser.parse_args(argv)
 
     if args.cmd == "init-db":
@@ -283,10 +359,19 @@ def main(argv: list[str] | None = None) -> int:
             new_envelope = json.load(f)
         with open(args.briefing_path, "r", encoding="utf-8") as f:
             briefing_text = f.read()
-        matched, newly, dropped = mark_delivered(new_envelope, briefing_text)
+        matched, web, newly, dropped = mark_delivered(new_envelope, briefing_text)
         print(
-            f"[state] delivered={matched} (newly recorded {newly}), "
+            f"[state] delivered={matched}+{web}web (newly recorded {newly}), "
             f"dropped={dropped} not-in-briefing",
+            file=sys.stderr,
+        )
+        return 0
+
+    if args.cmd == "export-seen-recent":
+        n = export_seen_recent(args.out_path, args.days)
+        print(
+            f"[state] exported {n} url(s) to {args.out_path} "
+            f"(window: last {args.days} days)",
             file=sys.stderr,
         )
         return 0

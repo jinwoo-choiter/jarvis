@@ -24,6 +24,8 @@ Before anything else, read these files:
      ]
    }
    ```
+4. **`seen_recent.txt`** inside the same `--add-dir` directory — a flat list of URLs already delivered within the last `dedup.recent_days` days, one URL per line. Treat this as a strict **deny-list** for `web_search` results (see §3).
+5. **`recent_briefs/*.md`** inside the same `--add-dir` directory — the most recent `dedup.recent_briefs_count` archived briefings, one file per past day. Use these **for cross-day duplicate-detection only**; do NOT re-surface their items as fresh content. They exist so you can recognise when a `web_search` result describes an event already covered.
 
 `/tmp/raw/new.json` (when present) contains the deduped, *previously-unseen* subset across all fetchers — prefer this over the per-source files when both are present.
 
@@ -45,11 +47,11 @@ This split exists because the user's leisure interests are inherently event-driv
 
 ### 2a. Deterministic input (already on disk)
 
-Read every JSON file exposed via `--add-dir`. Categorize each item by the user's interests as declared in `profile.local.yaml`. Items whose connection to the user's declared interests is weak should be dropped, not demoted.
+Read every JSON file exposed via `--add-dir`. Categorize each item by the user's interests as declared in `profile.yaml`. Items whose connection to the user's declared interests is weak should be dropped, not demoted.
 
 ### 2b. Heuristic input (`web_search`)
 
-Use the `web_search` tool to gather items for the keyword themes declared under `search_themes` in `config.local.yaml` (and, if absent, in `config.yaml`). Treat the themes literally — do not invent new themes the user did not declare.
+Use the `web_search` tool to gather items for the keyword themes declared under `search_themes` in `config.yaml`. Treat the themes literally — do not invent new themes the user did not declare.
 
 For each search result, record its source URL and the date the user actually needs (publication date for news-style items, event date for event-style items). Apply the time filter from §1.
 
@@ -57,18 +59,25 @@ For each search result, record its source URL and the date the user actually nee
 
 ## 3. Consolidate duplicates
 
-When multiple sources cover the same underlying event (same product launch, same announcement, same paper), merge them into a single briefing entry. Cite the most primary or original source — the manufacturer's announcement over a press rewrite, the arXiv paper over a blog post about it, the official site over an aggregator.
+Suppress duplicates along three axes:
+
+**Within today's run.** When multiple sources cover the same underlying event (same product launch, same announcement, same paper), merge them into a single briefing entry. Cite the most primary or original source — the manufacturer's announcement over a press rewrite, the arXiv paper over a blog post about it, the official site over an aggregator.
+
+**Cross-day URL deny-list.** If a `web_search` result's URL appears in `seen_recent.txt`, drop it silently. No exception, no follow-up — the URL was already in a recent brief, repeating it is noise.
+
+**Cross-day event-level dedup.** If a `web_search` result covers the same underlying event already covered in any of the `recent_briefs/*.md` files, drop it — *unless* the new article reports genuinely new development (a date change, a price change, a status change, a venue change). When there is real new development, surface it as a single `[update]`-prefixed entry that names the development plainly. Do not surface alternate-source rewrites of an event already covered.
 
 ---
 
 ## 4. Prioritize
 
-Rank items by *relevance to the user's `priority_keywords` and `upcoming_events`*. Apply two priority caps strictly:
+Rank items by *relevance to the user's `priority_keywords` and `upcoming_events`*. Apply three caps strictly:
 
 - **🔥 (top item of the day)** — at most **one** per day across the entire briefing. Use only when the item is unusually significant relative to the user's profile. If nothing qualifies, omit the marker entirely.
 - **📌 (notable)** — at most **five** per day across the entire briefing.
+- **plain (no marker)** — at most **five** per day across the entire briefing.
 
-Everything else is plain bullet (no marker). Inflation defeats the purpose; err on the side of fewer markers.
+Total ceiling is **eleven items** per briefing. If after applying these caps you still have surplus candidates, drop the lowest-relevance ones. Inflation defeats the purpose; err on the side of fewer items.
 
 ---
 
