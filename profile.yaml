@@ -35,4 +35,4 @@ upcoming_events:
 
 # The output language for the briefing body.
 # The JARVIS-voice opener and closer are always in English.
-output_language: "en"
+output_language: "ko"
