@@ -37,5 +37,5 @@
 
 ## 8. Smoke test
 
-- [ ] 8.1 Manually run `bash run.sh` once after the implementation lands. Verify (a) `/tmp/raw/seen_recent.txt` is populated, (b) `state/briefings/<today>.md` is created and matches `/tmp/briefing.md`, (c) `seen.sqlite` gains rows with `category = "web"` for any web-source URL in the brief, (d) the brief opens with 🎩 and ends with the closer, and (e) the brief contains no more than eleven items in total.
-- [ ] 8.2 On the *next* day's cron run, inspect the brief for cross-day repetition. Compare against the previous day's archive in `state/briefings/`. Expect zero exact-URL repetition. Note any same-event-different-source cases that slipped through; if more than one per week, the prompt's §3 wording is the first lever to tighten.
+- [x] 8.1 Manually run `bash run.sh` once after the implementation lands. Verify (a) `/tmp/raw/seen_recent.txt` is populated, (b) `state/briefings/<today>.md` is created and matches `/tmp/briefing.md`, (c) `seen.sqlite` gains rows with `category = "web"` for any web-source URL in the brief, (d) the brief opens with 🎩 and ends with the closer, and (e) the brief contains no more than eleven items in total.
+- [x] 8.2 On the *next* day's cron run, inspect the brief for cross-day repetition. Compare against the previous day's archive in `state/briefings/`. Expect zero exact-URL repetition. Note any same-event-different-source cases that slipped through; if more than one per week, the prompt's §3 wording is the first lever to tighten.
