@@ -31,8 +31,26 @@ log() {
   printf '%s %s\n' "$(ts)" "$*" | tee -a "$LOG_FILE" >&2
 }
 
+# Best-effort Slack notification. Silent on any failure — never cascades.
+# Requires $SLACK_WEBHOOK_URL (populated by sourcing .env) and $PY.
+slack_notify() {
+  local msg="$1"
+  [[ -n "${SLACK_WEBHOOK_URL:-}" ]] || return 0
+  [[ -n "${PY:-}" && -x "$PY" ]] || return 0
+  local payload
+  payload=$("$PY" -c 'import json, sys; print(json.dumps({"text": sys.argv[1]}))' "$msg" 2>/dev/null) \
+    || return 0
+  curl -sS -m 10 -H 'Content-Type: application/json' -d "$payload" \
+    "$SLACK_WEBHOOK_URL" >/dev/null 2>&1 || true
+}
+
 die() {
   log "FATAL $*"
+  # Alert on fatal failures so a silent Claude Code auth expiry (or similar)
+  # is noticed by the same day rather than after N missing briefs. Skipped
+  # cleanly if .env has not been sourced yet or the webhook is unreachable.
+  slack_notify "$(printf '🚨 [JARVIS] pipeline failed at %s\nFATAL %s\nLog: %s' \
+    "$(ts)" "$*" "$LOG_FILE")"
   exit 1
 }
 
