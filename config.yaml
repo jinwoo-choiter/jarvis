@@ -107,3 +107,11 @@ search_themes:
     - "Dubai Disneyland announcement"
     - "Disney park anniversary event"
     - "Disney theme park ride opening date"
+    # Retail discount windows — the goal is the *period* (start/end dates,
+    # membership tiers, coupon stacking), not day-to-day promotional noise.
+    - "올리브영 올영세일 기간"
+    - "올리브영 할인 행사 일정"
+    - "올리브영 세일 쿠폰"
+    - "COS 시즌 세일"
+    - "COS sale dates"
+    - "COS 코리아 할인"
