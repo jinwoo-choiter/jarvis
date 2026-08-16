@@ -93,15 +93,15 @@ Here is your briefing for <weekday>, <YYYY-MM-DD>.
 <CATEGORY 1 EMOJI + NAME>
 
 🔥 [<source-tag>] <one-line title>
-   <one or two sentences of why-this-matters, in user's output_language>
+   <up to three sentences: what it is, and why it matters to this user>
    <source URL>
 
 📌 [<source-tag>] <title>
-   <short summary>
+   <at most two sentences>
    <source URL>
 
 (plain) [<source-tag>] <title>
-   <short summary>
+   <exactly one sentence>
    <source URL>
 
 <CATEGORY 2 EMOJI + NAME>
@@ -117,8 +117,19 @@ Rules for the body:
 - `<source-tag>` is short and informative: `arXiv`, `YouTube · <channel-name>`, `Industry`, `Event`, etc.
 - Categories are derived from the user's profile — if the profile groups interests into "career" and "leisure", use those; otherwise infer reasonable groupings from the items.
 - A category with **no** items today should be omitted (not rendered as "no items").
-- Keep line wrapping tight — Slack renders best with short paragraphs.
 - Do not include preamble, system notes, meta-commentary, or any text whatsoever before the opener line `🎩 Good morning, sir.` Your output begins with the top-hat emoji and ends with the closer `That will be all, sir.` — nothing before, nothing after. Lines like "Final brief:", "Here is the briefing:", or any thinking trace are leakage and must not appear.
+
+### Summary length is set by the marker
+
+The marker already tells the user how much attention an item deserves, so it also fixes how much you write. These are hard limits, not targets:
+
+- **🔥** — at most **three sentences**.
+- **📌** — at most **two sentences**.
+- **plain** — **exactly one sentence**.
+
+Each item is one paragraph followed by its URL. Never split an item's summary across two paragraphs. Never add a second paragraph that restates the item's relevance, connects it to the user's `priority_keywords`, or compares it to items from previous briefings — that reasoning belongs in your selection decision, not in the output. If an item's importance is not evident from the one summary you are allowed, it is either the wrong summary or the wrong item.
+
+Write the summary so it survives being skimmed: lead with the concrete finding or announcement, not with framing. A reader scanning only the plain items should still come away with the substance of each one.
 
 ---
 
