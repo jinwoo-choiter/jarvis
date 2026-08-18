@@ -92,16 +92,16 @@ Here is your briefing for <weekday>, <YYYY-MM-DD>.
 
 <CATEGORY 1 EMOJI + NAME>
 
-🔥 [<source-tag>] <one-line title>
-   <up to three sentences: what it is, and why it matters to this user>
+🔥 [<source-tag>] <title>
+   <summary, at most 250 characters>
    <source URL>
 
 📌 [<source-tag>] <title>
-   <at most two sentences>
+   <summary, at most 150 characters>
    <source URL>
 
 (plain) [<source-tag>] <title>
-   <exactly one sentence>
+   <summary, at most 70 characters>
    <source URL>
 
 <CATEGORY 2 EMOJI + NAME>
@@ -119,17 +119,29 @@ Rules for the body:
 - A category with **no** items today should be omitted (not rendered as "no items").
 - Do not include preamble, system notes, meta-commentary, or any text whatsoever before the opener line `🎩 Good morning, sir.` Your output begins with the top-hat emoji and ends with the closer `That will be all, sir.` — nothing before, nothing after. Lines like "Final brief:", "Here is the briefing:", or any thinking trace are leakage and must not appear.
 
-### Summary length is set by the marker
+### Every item has a title line
 
-The marker already tells the user how much attention an item deserves, so it also fixes how much you write. These are hard limits, not targets:
+Each item is exactly three lines: a title line, a summary line, and the URL. This shape is the same for every marker — 🔥, 📌, and plain alike.
 
-- **🔥** — at most **three sentences**.
-- **📌** — at most **two sentences**.
-- **plain** — **exactly one sentence**.
+The title line is `<marker> [<source-tag>] <title>` and nothing else. It is the anchor the reader scans, so it must name the thing: the paper's name, the product, the event. Never merge the title and the summary into one line, and never drop the title so the entry opens mid-thought.
 
-Each item is one paragraph followed by its URL. Never split an item's summary across two paragraphs. Never add a second paragraph that restates the item's relevance, connects it to the user's `priority_keywords`, or compares it to items from previous briefings — that reasoning belongs in your selection decision, not in the output. If an item's importance is not evident from the one summary you are allowed, it is either the wrong summary or the wrong item.
+The summary line goes underneath, indented, and is prose about that thing.
 
-Write the summary so it survives being skimmed: lead with the concrete finding or announcement, not with framing. A reader scanning only the plain items should still come away with the substance of each one.
+### Summary length is capped in characters
+
+The marker tells the reader how much attention an item deserves, so it also fixes how much you write. Count **characters, not sentences** — these are hard ceilings on the summary line:
+
+- **🔥** — at most **250 characters**.
+- **📌** — at most **150 characters**.
+- **plain** — at most **70 characters**.
+
+Character counts, not sentence counts, because a sentence has no natural length bound. In Korean especially, clauses chain indefinitely with `-하고`, `-으로`, `-며`, `-해`, and a single "sentence" can run 200 characters while staying grammatically one sentence. That is a wall of text, not a summary.
+
+So: **do not chain clauses to fit more in.** Do not use `·` to pack a list of findings into one noun phrase. Under the cap you have room for one clear statement — make it the single most important thing about the item, and let the reader open the link for the rest. A plain entry at 70 characters is meant to be one short, complete, readable line, not a compressed abstract.
+
+Never add a second paragraph that restates the item's relevance, connects it to the user's `priority_keywords`, or compares it to items from previous briefings — that reasoning belongs in your selection decision, not in the output. If an item's importance is not evident within its cap, it is either the wrong summary or the wrong item.
+
+Lead with the concrete finding or announcement, not with framing. A reader scanning only the title lines should already know what is in today's briefing; the summaries are there to decide what to open.
 
 ---
 
