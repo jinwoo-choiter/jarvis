@@ -82,6 +82,23 @@ search_themes:
     # Dexterous hands
     - "dexterous robot hand release"
     - "robot hand teleoperation demo"
+    # Robot foundation models / policy releases
+    - "robot foundation model release"
+    - "vision-language-action model release"
+    - "generalist robot policy announcement"
+    # Training data — collection pipelines, datasets, teleop fleets
+    - "robot training dataset release"
+    - "humanoid data collection pipeline"
+    - "robot learning dataset announcement"
+    # Named companies — the themes above are topic-shaped, so without these
+    # a company's blog announcement has no path into the brief. YouTube
+    # channels cover their *videos*; these cover their *written* releases.
+    - "Figure AI announcement"
+    - "Skild AI"
+    - "Physical Intelligence robotics"
+    - "Unitree announcement"
+    - "Boston Dynamics announcement"
+    - "Genesis AI robotics announcement"
     # Competitor moves
     - "humanoid robotics company funding"
     - "humanoid robot factory deployment"

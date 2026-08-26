@@ -17,6 +17,14 @@ priority_keywords:
   - "humanoid platform"
   - "dexterous robotic hand"
   - "robot software framework"
+  - "robot foundation model"
+  - "robot training data collection"
+  # Company names — generic concept terms alone gave the ranking step no
+  # signal that a specific vendor's announcement matters.
+  - "Figure"
+  - "Skild AI"
+  - "Physical Intelligence"
+  - "Unitree"
   # Leisure
   - "BLACKPINK"
   - "성시경"
