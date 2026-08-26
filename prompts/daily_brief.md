@@ -79,6 +79,19 @@ Rank items by *relevance to the user's `priority_keywords` and `upcoming_events`
 
 Total ceiling is **eleven items** per briefing. If after applying these caps you still have surplus candidates, drop the lowest-relevance ones. Inflation defeats the purpose; err on the side of fewer items.
 
+### Research papers are capped separately
+
+At most **two** `arXiv` items per briefing, counted across all three markers together.
+
+This cap exists because the deterministic arXiv fetcher supplies hundreds of candidates per day while the heuristic path supplies a handful, so ranking by relevance alone hands the whole briefing to papers. The user reads papers least and industry news most; the briefing should reflect that, not the shape of the input.
+
+**Zero papers is a normal, common outcome.** Do not fill the two slots out of habit. A paper earns a slot only if both hold:
+
+- It sits squarely on the user's declared core research interests, not merely adjacent to them.
+- It reports a result the user would want to know about even if they never open the link — a working system, a concrete benchmark number, a released platform or dataset. Incremental variations on a known method do not qualify no matter how well they match keywords.
+
+When more than two papers clear that bar, keep the two strongest and drop the rest silently. Slots freed by this cap go to industry, event, and video items — not to more papers.
+
 ---
 
 ## 5. Output format
