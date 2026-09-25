@@ -123,7 +123,7 @@ JARVIS is designed to be forked. The repo tracks the maintainer's actual configu
 A working crontab on Apple Silicon macOS:
 
 ```cron
-PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin
+PATH=/Users/<you>/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin
 
 # JARVIS daily briefing — 07:00 local
 0 7 * * * /full/absolute/path/to/jarvis/run.sh >/dev/null 2>&1
@@ -132,11 +132,7 @@ PATH=/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin
 Notes:
 
 - `>/dev/null 2>&1` — `run.sh` already writes to `run.log`. Without the redirect, cron mails you on every run.
-- If `claude` was installed via `nvm`, it lives at `~/.nvm/versions/node/<version>/bin/claude` and that path is fragile (a `nvm install <newer>` invalidates it). The robust fix is one symlink:
-  ```bash
-  ln -sf "$(which claude)" /opt/homebrew/bin/claude
-  ```
-  Now the crontab `PATH` above is enough.
+- Put the directory that contains `claude` on the crontab `PATH` directly — run `which claude` in a normal shell to find it. The native build installs to `~/.local/bin/claude` and auto-updates in place, so that path stays valid. Avoid symlinking `claude` into another directory: if the install location changes (e.g. moving from an `nvm` npm-global install to the native build), the symlink dangles and every run fails at the synthesis step.
 - macOS may pop up a Full Disk Access prompt the first time cron runs. If it gets dismissed and the run fails silently, add `/usr/sbin/cron` under **System Settings → Privacy & Security → Full Disk Access**.
 
 Verify after the first scheduled run:
@@ -200,7 +196,7 @@ The single source of truth for any failed run is `run.log` in the repo root. `ta
 
 **No log entries for the expected time.** cron didn't fire. Verify `crontab -l`; check `log show --predicate 'process == "cron"' --last 1d`. On macOS, the most common cause is missing Full Disk Access for `/usr/sbin/cron`.
 
-**`claude: command not found` or `python3: not found` in the log.** cron's `PATH` is missing the binary's directory. See [Schedule it (cron)](#schedule-it-cron) — set `PATH=` in the crontab, or symlink `claude` into `/opt/homebrew/bin`.
+**`claude: command not found`, `python3: not found`, or `claude: Permission denied` in the log.** cron's `PATH` is missing the binary's directory, or points at a stale symlink left behind after `claude` moved. Run `which claude` in a normal shell and put that directory on the crontab `PATH` — see [Schedule it (cron)](#schedule-it-cron).
 
 **`STEP delivery done` but no Slack message.** The webhook URL is valid HTTP-wise but points at a revoked / wrong channel. Re-run `bash scripts/init.sh` to re-enter and use the opt-in smoke test to verify the new URL end-to-end.
 
